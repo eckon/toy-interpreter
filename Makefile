@@ -4,7 +4,7 @@ run:
 	cargo run
 
 test:
-	cargo test
+	cargo test -- --nocapture
 
 markdown:
 	npx prettier --write '**/*.md'
