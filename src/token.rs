@@ -1,4 +1,4 @@
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum TokenType {
     Illegal,
     Eof,
@@ -34,5 +34,13 @@ pub struct Token {
 impl Token {
     pub fn new(r#type: TokenType, literal: String) -> Token {
         Token { r#type, literal }
+    }
+
+    pub fn get_type(&self) -> TokenType {
+        self.r#type.clone()
+    }
+
+    pub fn get_literal(&self) -> String {
+        self.literal.clone()
     }
 }
