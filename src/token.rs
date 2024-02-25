@@ -28,11 +28,11 @@ pub enum TokenType {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Token {
     r#type: TokenType,
-    literal: String,
+    literal: Option<String>,
 }
 
 impl Token {
-    pub fn new(r#type: TokenType, literal: String) -> Token {
+    pub fn new(r#type: TokenType, literal: Option<String>) -> Token {
         Token { r#type, literal }
     }
 
@@ -40,7 +40,7 @@ impl Token {
         self.r#type.clone()
     }
 
-    pub fn get_literal(&self) -> String {
+    pub fn get_literal(&self) -> Option<String> {
         self.literal.clone()
     }
 }
