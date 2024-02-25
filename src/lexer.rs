@@ -59,10 +59,10 @@ impl Lexer {
                 return Token::new(TokenType::Int, literal);
             }
             Some('a'..='z' | 'A'..='Z' | '_') => {
-                // read identifier, allow snake_case
+                // read identifier, allow snake_case and numbers (not at start)
                 let start_position = self.position;
                 while let Some(ch) = self.ch {
-                    if !matches!(ch, 'a'..='z' | 'A'..='Z' | '_') {
+                    if !matches!(ch, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_') {
                         break;
                     }
                     self.read_char();
@@ -93,10 +93,27 @@ mod tests {
         token::{Token, TokenType},
     };
 
+    fn assert_token_tests(tests: Vec<Token>, input: &str) {
+        let mut l = Lexer::new(input.to_string());
+
+        for test in tests {
+            let token = l.next_token();
+            assert_eq!(token, test, "\nNEXT POSITION:\n{}", {
+                let mut context = l.input.to_string();
+                let current_token = context.get(l.position..l.position + 1).unwrap();
+                context.replace_range(
+                    l.position..l.position + 1,
+                    format!(">{}<", current_token).as_str(),
+                );
+                context
+            });
+        }
+    }
+
     #[test]
     fn test_simple_input() {
         let input = "=+(){},;";
-        let tests = [
+        let tests = vec![
             Token::new(TokenType::Assign, "=".to_string()),
             Token::new(TokenType::Plus, "+".to_string()),
             Token::new(TokenType::Lparen, "(".to_string()),
@@ -108,43 +125,40 @@ mod tests {
             Token::new(TokenType::Eof, "".to_string()),
         ];
 
-        let mut l = Lexer::new(input.to_string());
+        assert_token_tests(tests, input);
+    }
 
-        for test in tests {
-            let token = l.next_token();
-            assert_eq!(token, test)
-        }
+    #[test]
+    fn test_variable_with_number() {
+        let input = "let an0th3e_5 = 5";
+        let tests = vec![
+            Token::new(TokenType::Let, "let".to_string()),
+            Token::new(TokenType::Ident, "an0th3e_5".to_string()),
+            Token::new(TokenType::Assign, "=".to_string()),
+            Token::new(TokenType::Int, "5".to_string()),
+            Token::new(TokenType::Eof, "".to_string()),
+        ];
+
+        assert_token_tests(tests, input);
     }
 
     #[test]
     fn test_ignore_eof_as_number() {
         let input = "3210";
-        let tests = [
+        let tests = vec![
             Token::new(TokenType::Int, "3210".to_string()),
             Token::new(TokenType::Eof, "".to_string()),
         ];
 
-        let mut l = Lexer::new(input.to_string());
-
-        for test in tests {
-            let token = l.next_token();
-            assert_eq!(token, test)
-        }
+        assert_token_tests(tests, input);
     }
 
     #[test]
     fn test_empty_input() {
         let input = "";
-        let tests = [
-            Token::new(TokenType::Eof, "".to_string()),
-        ];
+        let tests = vec![Token::new(TokenType::Eof, "".to_string())];
 
-        let mut l = Lexer::new(input.to_string());
-
-        for test in tests {
-            let token = l.next_token();
-            assert_eq!(token, test)
-        }
+        assert_token_tests(tests, input);
     }
 
     #[test]
@@ -159,7 +173,7 @@ mod tests {
             let result = add(five, ten);
             ";
 
-        let tests = [
+        let tests = vec![
             Token::new(TokenType::Let, "let".to_string()),
             Token::new(TokenType::Ident, "five".to_string()),
             Token::new(TokenType::Assign, "=".to_string()),
@@ -199,19 +213,6 @@ mod tests {
             Token::new(TokenType::Eof, "".to_string()),
         ];
 
-        let mut l = Lexer::new(input.to_string());
-
-        for test in tests {
-            let token = l.next_token();
-            assert_eq!(token, test, "\nNEXT POSITION:\n{}", {
-                let mut context = l.input.to_string();
-                let current_token = context.get(l.position..l.position + 1).unwrap();
-                context.replace_range(
-                    l.position..l.position + 1,
-                    format!(">{}<", current_token).as_str(),
-                );
-                context
-            });
-        }
+        assert_token_tests(tests, input);
     }
 }
