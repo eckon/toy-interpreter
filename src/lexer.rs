@@ -19,6 +19,13 @@ impl Lexer {
         l
     }
 
+    fn highlighted_input(input: String, token: &Token) -> String {
+        let mut context = input.to_string();
+        context.insert(token.get_position().0, '>');
+        context.insert(token.get_position().1 + 1, '<');
+        context
+    }
+
     fn read_char(&mut self) {
         self.ch = self.input.chars().nth(self.read_position);
         self.position = self.read_position;
@@ -35,15 +42,19 @@ impl Lexer {
         }
 
         let token = match self.ch {
-            None => Token::new(TokenType::Eof, None),
-            Some('=') => Token::new(TokenType::Assign, None),
-            Some(';') => Token::new(TokenType::Semicolon, None),
-            Some('(') => Token::new(TokenType::Lparen, None),
-            Some(')') => Token::new(TokenType::Rparen, None),
-            Some(',') => Token::new(TokenType::Comma, None),
-            Some('+') => Token::new(TokenType::Plus, None),
-            Some('{') => Token::new(TokenType::Lbrace, None),
-            Some('}') => Token::new(TokenType::Rbrace, None),
+            None => Token::new(TokenType::Eof, None, (self.position, self.position)),
+            Some('=') => Token::new(TokenType::Assign, None, (self.position, self.position + 1)),
+            Some(';') => Token::new(
+                TokenType::Semicolon,
+                None,
+                (self.position, self.position + 1),
+            ),
+            Some('(') => Token::new(TokenType::Lparen, None, (self.position, self.position + 1)),
+            Some(')') => Token::new(TokenType::Rparen, None, (self.position, self.position + 1)),
+            Some(',') => Token::new(TokenType::Comma, None, (self.position, self.position + 1)),
+            Some('+') => Token::new(TokenType::Plus, None, (self.position, self.position + 1)),
+            Some('{') => Token::new(TokenType::Lbrace, None, (self.position, self.position + 1)),
+            Some('}') => Token::new(TokenType::Rbrace, None, (self.position, self.position + 1)),
             Some('0'..='9') => {
                 enum NumberType {
                     Int,
@@ -71,6 +82,7 @@ impl Lexer {
                         TokenType::Int,
                         // remove leading 0s
                         Some(literal.trim_start_matches('0').to_string()),
+                        (start_position, self.position),
                     ),
                     NumberType::Float => Token::new(
                         TokenType::Float,
@@ -81,6 +93,7 @@ impl Lexer {
                                 .trim_end_matches('.')
                                 .to_string(),
                         ),
+                        (start_position, self.position),
                     ),
                 };
 
@@ -99,15 +112,23 @@ impl Lexer {
 
                 let identifier = self.input[start_position..self.position].to_string();
                 let token = match identifier.as_str() {
-                    "fn" => Token::new(TokenType::Function, None),
-                    "let" => Token::new(TokenType::Let, None),
-                    _ => Token::new(TokenType::Ident, Some(identifier)),
+                    "fn" => Token::new(TokenType::Function, None, (start_position, self.position)),
+                    "let" => Token::new(TokenType::Let, None, (start_position, self.position)),
+                    _ => Token::new(
+                        TokenType::Ident,
+                        Some(identifier),
+                        (start_position, self.position),
+                    ),
                 };
 
                 // need to return to not skip the next token
                 return token;
             }
-            Some(ch) => Token::new(TokenType::Illegal, Some(ch.to_string())),
+            Some(ch) => Token::new(
+                TokenType::Illegal,
+                Some(ch.to_string()),
+                (self.position, self.position + 1),
+            ),
         };
 
         self.read_char();
@@ -122,70 +143,148 @@ mod tests {
         token::{Token, TokenType},
     };
 
-    fn assert_token_tests(tests: Vec<Token>, input: &str) {
-        let mut l = Lexer::new(input.to_string());
+    fn context_formatting(input: String, token: &Token) -> String {
+        format!(
+            "\n\tTYPE: {:?}\n\tLITERAL: {:?}\n\tPOSITION: {:?}\n\tCONTEXT:\n{}\n",
+            token.get_type(),
+            token.get_literal(),
+            token.get_position(),
+            Lexer::highlighted_input(input, token)
+        )
+    }
 
-        for test in tests {
+    #[test]
+    fn test_token_position_complex() {
+        let input = "
+            let x = 123;
+            let add = fn(x, y) {
+                x + y;
+            };
+
+            let this_is_wanted = 3.14;
+            let add2 = fn(x, y) {
+                x + y;
+            };
+        ";
+
+        let mut l = Lexer::new(input.to_string());
+        loop {
             let token = l.next_token();
-            assert_eq!(token, test, "\nNEXT POSITION:{}", {
-                let context = if l.input.len() < 10 {
-                    " FIX logging, currently short input will panic".to_string()
-                } else {
-                    let mut context = l.input.to_string();
-                    let current_token = context.get(l.position..l.position + 1).unwrap_or("");
-                    context.replace_range(
-                        l.position..l.position + 1,
-                        format!("#{}#", current_token).as_str(),
-                    );
-                    format!("\n{}", context)
-                };
-                context
-            });
+            if token.get_type() == TokenType::Eof {
+                break;
+            }
+
+            if let Some(t) = token.get_literal() {
+                if t == "this_is_wanted" {
+                    assert_eq!(
+                        token.get_position(),
+                        (114, 128),
+                        "{}",
+                        context_formatting(input.to_string(), &token)
+                    )
+                }
+            }
         }
     }
 
     #[test]
-    fn test_simple() {
+    fn test_token_position_simple() {
+        let input = "(){}";
+
+        let mut l = Lexer::new(input.to_string());
+        loop {
+            let token = l.next_token();
+            if token.get_type() == TokenType::Eof {
+                break;
+            }
+
+            if token.get_type() == TokenType::Rparen {
+                assert_eq!(
+                    token.get_position(),
+                    (1, 2),
+                    "{}",
+                    context_formatting(input.to_string(), &token)
+                )
+            }
+        }
+    }
+
+    #[test]
+    fn test_token_meaning_simple() {
         let input = "=+(){},;";
         let tests = vec![
-            Token::new(TokenType::Assign, None),
-            Token::new(TokenType::Plus, None),
-            Token::new(TokenType::Lparen, None),
-            Token::new(TokenType::Rparen, None),
-            Token::new(TokenType::Lbrace, None),
-            Token::new(TokenType::Rbrace, None),
-            Token::new(TokenType::Comma, None),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Eof, None),
+            TokenType::Assign,
+            TokenType::Plus,
+            TokenType::Lparen,
+            TokenType::Rparen,
+            TokenType::Lbrace,
+            TokenType::Rbrace,
+            TokenType::Comma,
+            TokenType::Semicolon,
+            TokenType::Eof,
         ];
 
-        assert_token_tests(tests, input);
+        let mut l = Lexer::new(input.to_string());
+        for test in tests {
+            let token = l.next_token();
+            assert_eq!(
+                token.get_type(),
+                test,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+        }
     }
 
     #[test]
     fn test_variable_name_with_number() {
         let input = "let an0th3e_5 = 5;";
         let tests = vec![
-            Token::new(TokenType::Let, None),
-            Token::new(TokenType::Ident, Some("an0th3e_5".to_string())),
-            Token::new(TokenType::Assign, None),
-            Token::new(TokenType::Int, Some("5".to_string())),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Eof, None),
+            (TokenType::Let, None),
+            (TokenType::Ident, Some("an0th3e_5".to_string())),
+            (TokenType::Assign, None),
+            (TokenType::Int, Some("5".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::Eof, None),
         ];
 
-        assert_token_tests(tests, input);
+        let mut l = Lexer::new(input.to_string());
+        for test in tests {
+            let token = l.next_token();
+            assert_eq!(
+                token.get_type(),
+                test.0,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+
+            assert_eq!(
+                token.get_literal(),
+                test.1,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+        }
     }
 
     #[test]
     fn test_integer_with_leading_zero() {
         let input = "001230";
         let tests = vec![
-            Token::new(TokenType::Int, Some("1230".to_string())),
-            Token::new(TokenType::Eof, None),
+            (TokenType::Int, Some("1230".to_string())),
+            (TokenType::Eof, None),
         ];
 
-        assert_token_tests(tests, input);
+        let mut l = Lexer::new(input.to_string());
+        for test in tests {
+            let token = l.next_token();
+            assert_eq!(
+                token.get_literal(),
+                test.1,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+        }
     }
 
     #[test]
@@ -193,46 +292,95 @@ mod tests {
         let input = "
             let x = 3.14;
             let y = 2.00;
-            let z = 0.5;";
+            let z = 0.5;
+        ";
+
         let tests = vec![
-            Token::new(TokenType::Let, None),
-            Token::new(TokenType::Ident, Some("x".to_string())),
-            Token::new(TokenType::Assign, None),
-            Token::new(TokenType::Float, Some("3.14".to_string())),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Let, None),
-            Token::new(TokenType::Ident, Some("y".to_string())),
-            Token::new(TokenType::Assign, None),
-            Token::new(TokenType::Float, Some("2".to_string())),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Let, None),
-            Token::new(TokenType::Ident, Some("z".to_string())),
-            Token::new(TokenType::Assign, None),
-            Token::new(TokenType::Float, Some("0.5".to_string())),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Eof, None),
+            (TokenType::Let, None),
+            (TokenType::Ident, Some("x".to_string())),
+            (TokenType::Assign, None),
+            (TokenType::Float, Some("3.14".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::Let, None),
+            (TokenType::Ident, Some("y".to_string())),
+            (TokenType::Assign, None),
+            (TokenType::Float, Some("2".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::Let, None),
+            (TokenType::Ident, Some("z".to_string())),
+            (TokenType::Assign, None),
+            (TokenType::Float, Some("0.5".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::Eof, None),
         ];
 
-        assert_token_tests(tests, input);
+        let mut l = Lexer::new(input.to_string());
+        for test in tests {
+            let token = l.next_token();
+            assert_eq!(
+                token.get_type(),
+                test.0,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+
+            assert_eq!(
+                token.get_literal(),
+                test.1,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+        }
     }
 
     #[test]
     fn test_ignore_eof_as_number() {
         let input = "3210";
         let tests = vec![
-            Token::new(TokenType::Int, Some("3210".to_string())),
-            Token::new(TokenType::Eof, None),
+            (TokenType::Int, Some("3210".to_string())),
+            (TokenType::Eof, None),
         ];
 
-        assert_token_tests(tests, input);
+        let mut l = Lexer::new(input.to_string());
+        for test in tests {
+            let token = l.next_token();
+            assert_eq!(
+                token.get_type(),
+                test.0,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+
+            assert_eq!(
+                token.get_literal(),
+                test.1,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+        }
     }
 
     #[test]
     fn test_empty() {
         let input = "";
-        let tests = vec![Token::new(TokenType::Eof, None)];
+        let test = (TokenType::Eof, None);
 
-        assert_token_tests(tests, input);
+        let mut l = Lexer::new(input.to_string());
+        let token = l.next_token();
+
+        assert_eq!(
+            token.get_type(),
+            test.0,
+            "{}",
+            context_formatting(input.to_string(), &token)
+        );
+
+        assert_eq!(
+            token.get_literal(),
+            test.1,
+            "{}",
+            context_formatting(input.to_string(), &token)
+        );
     }
 
     #[test]
@@ -248,45 +396,61 @@ mod tests {
             ";
 
         let tests = vec![
-            Token::new(TokenType::Let, None),
-            Token::new(TokenType::Ident, Some("five".to_string())),
-            Token::new(TokenType::Assign, None),
-            Token::new(TokenType::Int, Some("5".to_string())),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Let, None),
-            Token::new(TokenType::Ident, Some("ten".to_string())),
-            Token::new(TokenType::Assign, None),
-            Token::new(TokenType::Int, Some("10".to_string())),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Let, None),
-            Token::new(TokenType::Ident, Some("add".to_string())),
-            Token::new(TokenType::Assign, None),
-            Token::new(TokenType::Function, None),
-            Token::new(TokenType::Lparen, None),
-            Token::new(TokenType::Ident, Some("x".to_string())),
-            Token::new(TokenType::Comma, None),
-            Token::new(TokenType::Ident, Some("y".to_string())),
-            Token::new(TokenType::Rparen, None),
-            Token::new(TokenType::Lbrace, None),
-            Token::new(TokenType::Ident, Some("x".to_string())),
-            Token::new(TokenType::Plus, None),
-            Token::new(TokenType::Ident, Some("y".to_string())),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Rbrace, None),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Let, None),
-            Token::new(TokenType::Ident, Some("result".to_string())),
-            Token::new(TokenType::Assign, None),
-            Token::new(TokenType::Ident, Some("add".to_string())),
-            Token::new(TokenType::Lparen, None),
-            Token::new(TokenType::Ident, Some("five".to_string())),
-            Token::new(TokenType::Comma, None),
-            Token::new(TokenType::Ident, Some("ten".to_string())),
-            Token::new(TokenType::Rparen, None),
-            Token::new(TokenType::Semicolon, None),
-            Token::new(TokenType::Eof, None),
+            (TokenType::Let, None),
+            (TokenType::Ident, Some("five".to_string())),
+            (TokenType::Assign, None),
+            (TokenType::Int, Some("5".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::Let, None),
+            (TokenType::Ident, Some("ten".to_string())),
+            (TokenType::Assign, None),
+            (TokenType::Int, Some("10".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::Let, None),
+            (TokenType::Ident, Some("add".to_string())),
+            (TokenType::Assign, None),
+            (TokenType::Function, None),
+            (TokenType::Lparen, None),
+            (TokenType::Ident, Some("x".to_string())),
+            (TokenType::Comma, None),
+            (TokenType::Ident, Some("y".to_string())),
+            (TokenType::Rparen, None),
+            (TokenType::Lbrace, None),
+            (TokenType::Ident, Some("x".to_string())),
+            (TokenType::Plus, None),
+            (TokenType::Ident, Some("y".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::Rbrace, None),
+            (TokenType::Semicolon, None),
+            (TokenType::Let, None),
+            (TokenType::Ident, Some("result".to_string())),
+            (TokenType::Assign, None),
+            (TokenType::Ident, Some("add".to_string())),
+            (TokenType::Lparen, None),
+            (TokenType::Ident, Some("five".to_string())),
+            (TokenType::Comma, None),
+            (TokenType::Ident, Some("ten".to_string())),
+            (TokenType::Rparen, None),
+            (TokenType::Semicolon, None),
+            (TokenType::Eof, None),
         ];
 
-        assert_token_tests(tests, input);
+        let mut l = Lexer::new(input.to_string());
+        for test in tests {
+            let token = l.next_token();
+            assert_eq!(
+                token.get_type(),
+                test.0,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+
+            assert_eq!(
+                token.get_literal(),
+                test.1,
+                "{}",
+                context_formatting(input.to_string(), &token)
+            );
+        }
     }
 }
