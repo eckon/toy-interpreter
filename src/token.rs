@@ -6,6 +6,7 @@ pub enum TokenType {
     // Identifiers + literals
     Ident,
     Int,
+    Float,
 
     // Operators
     Assign,

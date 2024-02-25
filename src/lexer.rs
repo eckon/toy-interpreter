@@ -45,18 +45,47 @@ impl Lexer {
             Some('{') => Token::new(TokenType::Lbrace, None),
             Some('}') => Token::new(TokenType::Rbrace, None),
             Some('0'..='9') => {
+                enum NumberType {
+                    Int,
+                    Float,
+                }
+
+                let mut number_type = NumberType::Int;
+
                 let start_position = self.position;
                 while let Some(ch) = self.ch {
-                    if !ch.is_ascii_digit() {
+                    if ch == '.' {
+                        number_type = NumberType::Float;
+                    }
+
+                    if !ch.is_ascii_digit() && ch != '.' {
                         break;
                     }
+
                     self.read_char();
                 }
 
                 let literal = self.input[start_position..self.position].to_string();
+                let token = match number_type {
+                    NumberType::Int => Token::new(
+                        TokenType::Int,
+                        // remove leading 0s
+                        Some(literal.trim_start_matches('0').to_string()),
+                    ),
+                    NumberType::Float => Token::new(
+                        TokenType::Float,
+                        Some(
+                            // remove trailing 0s and 0s after 0. and 0.0
+                            literal
+                                .trim_end_matches('0')
+                                .trim_end_matches('.')
+                                .to_string(),
+                        ),
+                    ),
+                };
 
                 // need to return to not skip the next token
-                return Token::new(TokenType::Int, Some(literal));
+                return token;
             }
             Some('a'..='z' | 'A'..='Z' | '_') => {
                 // read identifier, allow snake_case and numbers (not at start)
@@ -98,20 +127,25 @@ mod tests {
 
         for test in tests {
             let token = l.next_token();
-            assert_eq!(token, test, "\nNEXT POSITION:\n{}", {
-                let mut context = l.input.to_string();
-                let current_token = context.get(l.position..l.position + 1).unwrap();
-                context.replace_range(
-                    l.position..l.position + 1,
-                    format!(">{}<", current_token).as_str(),
-                );
+            assert_eq!(token, test, "\nNEXT POSITION:{}", {
+                let context = if l.input.len() < 10 {
+                    " FIX logging, currently short input will panic".to_string()
+                } else {
+                    let mut context = l.input.to_string();
+                    let current_token = context.get(l.position..l.position + 1).unwrap_or("");
+                    context.replace_range(
+                        l.position..l.position + 1,
+                        format!("#{}#", current_token).as_str(),
+                    );
+                    format!("\n{}", context)
+                };
                 context
             });
         }
     }
 
     #[test]
-    fn test_simple_input() {
+    fn test_simple() {
         let input = "=+(){},;";
         let tests = vec![
             Token::new(TokenType::Assign, None),
@@ -129,13 +163,53 @@ mod tests {
     }
 
     #[test]
-    fn test_variable_with_number() {
-        let input = "let an0th3e_5 = 5";
+    fn test_variable_name_with_number() {
+        let input = "let an0th3e_5 = 5;";
         let tests = vec![
             Token::new(TokenType::Let, None),
             Token::new(TokenType::Ident, Some("an0th3e_5".to_string())),
             Token::new(TokenType::Assign, None),
             Token::new(TokenType::Int, Some("5".to_string())),
+            Token::new(TokenType::Semicolon, None),
+            Token::new(TokenType::Eof, None),
+        ];
+
+        assert_token_tests(tests, input);
+    }
+
+    #[test]
+    fn test_integer_with_leading_zero() {
+        let input = "001230";
+        let tests = vec![
+            Token::new(TokenType::Int, Some("1230".to_string())),
+            Token::new(TokenType::Eof, None),
+        ];
+
+        assert_token_tests(tests, input);
+    }
+
+    #[test]
+    fn test_float() {
+        let input = "
+            let x = 3.14;
+            let y = 2.00;
+            let z = 0.5;";
+        let tests = vec![
+            Token::new(TokenType::Let, None),
+            Token::new(TokenType::Ident, Some("x".to_string())),
+            Token::new(TokenType::Assign, None),
+            Token::new(TokenType::Float, Some("3.14".to_string())),
+            Token::new(TokenType::Semicolon, None),
+            Token::new(TokenType::Let, None),
+            Token::new(TokenType::Ident, Some("y".to_string())),
+            Token::new(TokenType::Assign, None),
+            Token::new(TokenType::Float, Some("2".to_string())),
+            Token::new(TokenType::Semicolon, None),
+            Token::new(TokenType::Let, None),
+            Token::new(TokenType::Ident, Some("z".to_string())),
+            Token::new(TokenType::Assign, None),
+            Token::new(TokenType::Float, Some("0.5".to_string())),
+            Token::new(TokenType::Semicolon, None),
             Token::new(TokenType::Eof, None),
         ];
 
@@ -154,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_input() {
+    fn test_empty() {
         let input = "";
         let tests = vec![Token::new(TokenType::Eof, None)];
 
@@ -162,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn test_complex_input() {
+    fn test_complex() {
         let input = "
             let five = 5;
             let ten = 10;
