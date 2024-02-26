@@ -31,6 +31,11 @@ pub enum TokenType {
     // Keywords
     Function,
     Let,
+    True,
+    False,
+    If,
+    Else,
+    Return,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]

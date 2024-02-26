@@ -32,6 +32,10 @@ impl Lexer {
         self.read_position += 1;
     }
 
+    fn peak_char(&self) -> Option<char> {
+        self.input.chars().nth(self.read_position)
+    }
+
     pub fn next_token(&mut self) -> Token {
         // whitespaces have no meaning for now - done here to keep not concat variable names etc.
         while let Some(ch) = self.ch {
@@ -118,6 +122,11 @@ impl Lexer {
                 let mut token = match identifier.as_str() {
                     "fn" => Token::new(TokenType::Function, start_position),
                     "let" => Token::new(TokenType::Let, start_position),
+                    "true" => Token::new(TokenType::True, start_position),
+                    "false" => Token::new(TokenType::False, start_position),
+                    "if" => Token::new(TokenType::If, start_position),
+                    "else" => Token::new(TokenType::Else, start_position),
+                    "return" => Token::new(TokenType::Return, start_position),
                     _ => {
                         let mut token = Token::new(TokenType::Ident, start_position);
                         token.set_literal(identifier);
@@ -405,6 +414,15 @@ mod tests {
             };
 
             let result = add(five, ten);
+
+            !-/*5;
+            5 < 10 > 5;
+
+            if (5 < 10) {
+                return true;
+            } else {
+                return false;
+            }
             ";
 
         let tests = vec![
@@ -444,6 +462,35 @@ mod tests {
             (TokenType::Ident, Some("ten".to_string())),
             (TokenType::Rparen, None),
             (TokenType::Semicolon, None),
+            (TokenType::Bang, None),
+            (TokenType::Minus, None),
+            (TokenType::Slash, None),
+            (TokenType::Asterisk, None),
+            (TokenType::Int, Some("5".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::Int, Some("5".to_string())),
+            (TokenType::Lt, None),
+            (TokenType::Int, Some("10".to_string())),
+            (TokenType::Gt, None),
+            (TokenType::Int, Some("5".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::If, None),
+            (TokenType::Lparen, None),
+            (TokenType::Int, Some("5".to_string())),
+            (TokenType::Lt, None),
+            (TokenType::Int, Some("10".to_string())),
+            (TokenType::Rparen, None),
+            (TokenType::Lbrace, None),
+            (TokenType::Return, None),
+            (TokenType::True, None),
+            (TokenType::Semicolon, None),
+            (TokenType::Rbrace, None),
+            (TokenType::Else, None),
+            (TokenType::Lbrace, None),
+            (TokenType::Return, None),
+            (TokenType::False, None),
+            (TokenType::Semicolon, None),
+            (TokenType::Rbrace, None),
             (TokenType::Eof, None),
         ];
 
