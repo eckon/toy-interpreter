@@ -42,19 +42,21 @@ impl Lexer {
         }
 
         let token = match self.ch {
-            None => Token::new(TokenType::Eof, None, (self.position, self.position)),
-            Some('=') => Token::new(TokenType::Assign, None, (self.position, self.position + 1)),
-            Some(';') => Token::new(
-                TokenType::Semicolon,
-                None,
-                (self.position, self.position + 1),
-            ),
-            Some('(') => Token::new(TokenType::Lparen, None, (self.position, self.position + 1)),
-            Some(')') => Token::new(TokenType::Rparen, None, (self.position, self.position + 1)),
-            Some(',') => Token::new(TokenType::Comma, None, (self.position, self.position + 1)),
-            Some('+') => Token::new(TokenType::Plus, None, (self.position, self.position + 1)),
-            Some('{') => Token::new(TokenType::Lbrace, None, (self.position, self.position + 1)),
-            Some('}') => Token::new(TokenType::Rbrace, None, (self.position, self.position + 1)),
+            None => Token::new(TokenType::Eof, self.position),
+            Some('=') => Token::new(TokenType::Assign, self.position),
+            Some(';') => Token::new(TokenType::Semicolon, self.position),
+            Some('(') => Token::new(TokenType::Lparen, self.position),
+            Some(')') => Token::new(TokenType::Rparen, self.position),
+            Some('{') => Token::new(TokenType::Lbrace, self.position),
+            Some('}') => Token::new(TokenType::Rbrace, self.position),
+            Some(',') => Token::new(TokenType::Comma, self.position),
+            Some('+') => Token::new(TokenType::Plus, self.position),
+            Some('-') => Token::new(TokenType::Minus, self.position),
+            Some('!') => Token::new(TokenType::Bang, self.position),
+            Some('*') => Token::new(TokenType::Asterisk, self.position),
+            Some('/') => Token::new(TokenType::Slash, self.position),
+            Some('<') => Token::new(TokenType::Lt, self.position),
+            Some('>') => Token::new(TokenType::Gt, self.position),
             Some('0'..='9') => {
                 enum NumberType {
                     Int,
@@ -77,25 +79,27 @@ impl Lexer {
                 }
 
                 let literal = self.input[start_position..self.position].to_string();
-                let token = match number_type {
-                    NumberType::Int => Token::new(
-                        TokenType::Int,
+                let mut token = match number_type {
+                    NumberType::Int => {
+                        let mut token = Token::new(TokenType::Int, start_position);
                         // remove leading 0s
-                        Some(literal.trim_start_matches('0').to_string()),
-                        (start_position, self.position),
-                    ),
-                    NumberType::Float => Token::new(
-                        TokenType::Float,
-                        Some(
+                        token.set_literal(literal.trim_start_matches('0').to_string());
+                        token
+                    }
+                    NumberType::Float => {
+                        let mut token = Token::new(TokenType::Float, start_position);
+                        token.set_literal(
                             // remove trailing 0s and 0s after 0. and 0.0
                             literal
                                 .trim_end_matches('0')
                                 .trim_end_matches('.')
                                 .to_string(),
-                        ),
-                        (start_position, self.position),
-                    ),
+                        );
+                        token
+                    }
                 };
+
+                token.set_length(self.position - start_position);
 
                 // need to return to not skip the next token
                 return token;
@@ -111,24 +115,26 @@ impl Lexer {
                 }
 
                 let identifier = self.input[start_position..self.position].to_string();
-                let token = match identifier.as_str() {
-                    "fn" => Token::new(TokenType::Function, None, (start_position, self.position)),
-                    "let" => Token::new(TokenType::Let, None, (start_position, self.position)),
-                    _ => Token::new(
-                        TokenType::Ident,
-                        Some(identifier),
-                        (start_position, self.position),
-                    ),
+                let mut token = match identifier.as_str() {
+                    "fn" => Token::new(TokenType::Function, start_position),
+                    "let" => Token::new(TokenType::Let, start_position),
+                    _ => {
+                        let mut token = Token::new(TokenType::Ident, start_position);
+                        token.set_literal(identifier);
+                        token
+                    }
                 };
+
+                token.set_length(self.position - start_position);
 
                 // need to return to not skip the next token
                 return token;
             }
-            Some(ch) => Token::new(
-                TokenType::Illegal,
-                Some(ch.to_string()),
-                (self.position, self.position + 1),
-            ),
+            Some(ch) => {
+                let mut token = Token::new(TokenType::Illegal, self.position);
+                token.set_literal(ch.to_string());
+                token
+            }
         };
 
         self.read_char();
@@ -211,10 +217,16 @@ mod tests {
 
     #[test]
     fn test_token_meaning_simple() {
-        let input = "=+(){},;";
+        let input = "=+-<>!*/(){},;";
         let tests = vec![
             TokenType::Assign,
             TokenType::Plus,
+            TokenType::Minus,
+            TokenType::Lt,
+            TokenType::Gt,
+            TokenType::Bang,
+            TokenType::Asterisk,
+            TokenType::Slash,
             TokenType::Lparen,
             TokenType::Rparen,
             TokenType::Lbrace,
