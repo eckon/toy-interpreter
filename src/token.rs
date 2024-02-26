@@ -11,6 +11,13 @@ pub enum TokenType {
     // Operators
     Assign,
     Plus,
+    Minus,
+    Bang,
+    Asterisk,
+    Slash,
+
+    Lt,
+    Gt,
 
     // Delimiters
     Comma,
@@ -31,17 +38,44 @@ pub struct Token {
     r#type: TokenType,
     literal: Option<String>,
     start_postion: usize,
-    end_position: usize,
+    length: usize,
 }
 
 impl Token {
-    pub fn new(r#type: TokenType, literal: Option<String>, position: (usize, usize)) -> Token {
+    pub fn new(r#type: TokenType, start_postion: usize) -> Token {
+        let length = match r#type {
+            TokenType::Assign
+            | TokenType::Plus
+            | TokenType::Minus
+            | TokenType::Bang
+            | TokenType::Asterisk
+            | TokenType::Slash
+            | TokenType::Lt
+            | TokenType::Gt
+            | TokenType::Comma
+            | TokenType::Semicolon
+            | TokenType::Lparen
+            | TokenType::Rparen
+            | TokenType::Lbrace
+            | TokenType::Rbrace => 1,
+            TokenType::Illegal | TokenType::Eof => 0,
+            _ => 0,
+        };
+
         Token {
             r#type,
-            literal,
-            start_postion: position.0,
-            end_position: position.1,
+            literal: None,
+            start_postion,
+            length,
         }
+    }
+
+    pub fn set_length(&mut self, length: usize) {
+        self.length = length;
+    }
+
+    pub fn set_literal(&mut self, literal: String) {
+        self.literal = Some(literal);
     }
 
     pub fn get_type(&self) -> TokenType {
@@ -53,6 +87,6 @@ impl Token {
     }
 
     pub fn get_position(&self) -> (usize, usize) {
-        (self.start_postion, self.end_position)
+        (self.start_postion, self.start_postion + self.length)
     }
 }
