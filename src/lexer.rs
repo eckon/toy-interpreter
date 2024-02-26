@@ -32,7 +32,7 @@ impl Lexer {
         self.read_position += 1;
     }
 
-    fn peak_char(&self) -> Option<char> {
+    fn peek_char(&self) -> Option<char> {
         self.input.chars().nth(self.read_position)
     }
 
@@ -45,36 +45,36 @@ impl Lexer {
             self.read_char();
         }
 
+        // store start postition even after reading more characters
+        let start_pos = self.position;
         let token = match self.ch {
-            None => Token::new(TokenType::Eof, self.position),
-            Some(';') => Token::new(TokenType::Semicolon, self.position),
-            Some('(') => Token::new(TokenType::Lparen, self.position),
-            Some(')') => Token::new(TokenType::Rparen, self.position),
-            Some('{') => Token::new(TokenType::Lbrace, self.position),
-            Some('}') => Token::new(TokenType::Rbrace, self.position),
-            Some(',') => Token::new(TokenType::Comma, self.position),
-            Some('+') => Token::new(TokenType::Plus, self.position),
-            Some('-') => Token::new(TokenType::Minus, self.position),
-            Some('*') => Token::new(TokenType::Asterisk, self.position),
-            Some('/') => Token::new(TokenType::Slash, self.position),
-            Some('<') => Token::new(TokenType::Lt, self.position),
-            Some('>') => Token::new(TokenType::Gt, self.position),
+            None => Token::new(TokenType::Eof, "".into(), start_pos),
+            Some(';') => Token::new(TokenType::Semicolon, ";".into(), start_pos),
+            Some('(') => Token::new(TokenType::Lparen, "(".into(), start_pos),
+            Some(')') => Token::new(TokenType::Rparen, ")".into(), start_pos),
+            Some('{') => Token::new(TokenType::Lbrace, "{".into(), start_pos),
+            Some('}') => Token::new(TokenType::Rbrace, "}".into(), start_pos),
+            Some(',') => Token::new(TokenType::Comma, ",".into(), start_pos),
+            Some('+') => Token::new(TokenType::Plus, "+".into(), start_pos),
+            Some('-') => Token::new(TokenType::Minus, "-".into(), start_pos),
+            Some('*') => Token::new(TokenType::Asterisk, "*".into(), start_pos),
+            Some('/') => Token::new(TokenType::Slash, "/".into(), start_pos),
+            Some('<') => Token::new(TokenType::Lt, "<".into(), start_pos),
+            Some('>') => Token::new(TokenType::Gt, ">".into(), start_pos),
             Some('=') => {
-                if let Some('=') = self.peak_char() {
-                    let token = Token::new(TokenType::Eq, self.position);
+                if let Some('=') = self.peek_char() {
                     self.read_char();
-                    token
+                    Token::new(TokenType::Eq, "==".into(), start_pos)
                 } else {
-                    Token::new(TokenType::Assign, self.position)
+                    Token::new(TokenType::Assign, "=".into(), start_pos)
                 }
             }
             Some('!') => {
-                if let Some('=') = self.peak_char() {
-                    let token = Token::new(TokenType::NotEq, self.position);
+                if let Some('=') = self.peek_char() {
                     self.read_char();
-                    token
+                    Token::new(TokenType::NotEq, "!=".into(), start_pos)
                 } else {
-                    Token::new(TokenType::Bang, self.position)
+                    Token::new(TokenType::Bang, "!".into(), start_pos)
                 }
             }
 
@@ -86,7 +86,7 @@ impl Lexer {
 
                 let mut number_type = NumberType::Int;
 
-                let start_position = self.position;
+                let start_pos = self.position;
                 while let Some(ch) = self.ch {
                     if ch == '.' {
                         number_type = NumberType::Float;
@@ -99,25 +99,23 @@ impl Lexer {
                     self.read_char();
                 }
 
-                let literal = self.input[start_position..self.position].to_string();
+                let literal = self.input[start_pos..self.position].to_string();
                 let token = match number_type {
-                    NumberType::Int => {
-                        let mut token = Token::new(TokenType::Int, start_position);
+                    NumberType::Int => Token::new(
+                        TokenType::Int,
                         // remove leading 0s
-                        token.set_literal(literal.trim_start_matches('0').to_string());
-                        token
-                    }
-                    NumberType::Float => {
-                        let mut token = Token::new(TokenType::Float, start_position);
-                        token.set_literal(
-                            // remove trailing 0s and 0s after 0. and 0.0
-                            literal
-                                .trim_end_matches('0')
-                                .trim_end_matches('.')
-                                .to_string(),
-                        );
-                        token
-                    }
+                        literal.trim_start_matches('0').to_string(),
+                        start_pos,
+                    ),
+                    NumberType::Float => Token::new(
+                        TokenType::Float,
+                        // remove trailing 0s and 0s after 0. and 0.0
+                        literal
+                            .trim_end_matches('0')
+                            .trim_end_matches('.')
+                            .to_string(),
+                        start_pos,
+                    ),
                 };
 
                 // need to return to not skip the next token
@@ -125,7 +123,7 @@ impl Lexer {
             }
             Some('a'..='z' | 'A'..='Z' | '_') => {
                 // read identifier, allow snake_case and numbers (not at start)
-                let start_position = self.position;
+                let start_pos = self.position;
                 while let Some(ch) = self.ch {
                     if !matches!(ch, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_') {
                         break;
@@ -133,30 +131,22 @@ impl Lexer {
                     self.read_char();
                 }
 
-                let identifier = self.input[start_position..self.position].to_string();
+                let identifier = self.input[start_pos..self.position].to_string();
                 let token = match identifier.as_str() {
-                    "fn" => Token::new(TokenType::Function, start_position),
-                    "let" => Token::new(TokenType::Let, start_position),
-                    "true" => Token::new(TokenType::True, start_position),
-                    "false" => Token::new(TokenType::False, start_position),
-                    "if" => Token::new(TokenType::If, start_position),
-                    "else" => Token::new(TokenType::Else, start_position),
-                    "return" => Token::new(TokenType::Return, start_position),
-                    _ => {
-                        let mut token = Token::new(TokenType::Ident, start_position);
-                        token.set_literal(identifier);
-                        token
-                    }
+                    "fn" => Token::new(TokenType::Function, "fn".into(), start_pos),
+                    "let" => Token::new(TokenType::Let, "let".into(), start_pos),
+                    "true" => Token::new(TokenType::True, "true".into(), start_pos),
+                    "false" => Token::new(TokenType::False, "false".into(), start_pos),
+                    "if" => Token::new(TokenType::If, "if".into(), start_pos),
+                    "else" => Token::new(TokenType::Else, "else".into(), start_pos),
+                    "return" => Token::new(TokenType::Return, "return".into(), start_pos),
+                    _ => Token::new(TokenType::Ident, identifier, start_pos),
                 };
 
                 // need to return to not skip the next token
                 return token;
             }
-            Some(ch) => {
-                let mut token = Token::new(TokenType::Illegal, self.position);
-                token.set_literal(ch.to_string());
-                token
-            }
+            Some(ch) => Token::new(TokenType::Illegal, ch.to_string(), start_pos),
         };
 
         self.read_char();
@@ -204,15 +194,13 @@ mod tests {
                 break;
             }
 
-            if let Some(t) = token.get_literal() {
-                if t == "this_is_wanted" {
-                    assert_eq!(
-                        token.get_position(),
-                        (114, 128),
-                        "{}",
-                        context_formatting(input.to_string(), &token)
-                    )
-                }
+            if token.get_literal() == "this_is_wanted" {
+                assert_eq!(
+                    token.get_position(),
+                    (114, 128),
+                    "{}",
+                    context_formatting(input.to_string(), &token)
+                )
             }
 
             if token.get_type() == TokenType::True {
@@ -285,12 +273,12 @@ mod tests {
     fn test_variable_name_with_number() {
         let input = "let an0th3e_5 = 5;";
         let tests = vec![
-            (TokenType::Let, None),
-            (TokenType::Ident, Some("an0th3e_5".to_string())),
-            (TokenType::Assign, None),
-            (TokenType::Int, Some("5".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Eof, None),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "an0th3e_5"),
+            (TokenType::Assign, "="),
+            (TokenType::Int, "5"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Eof, ""),
         ];
 
         let mut l = Lexer::new(input.to_string());
@@ -315,10 +303,7 @@ mod tests {
     #[test]
     fn test_integer_with_leading_zero() {
         let input = "001230";
-        let tests = vec![
-            (TokenType::Int, Some("1230".to_string())),
-            (TokenType::Eof, None),
-        ];
+        let tests = vec![(TokenType::Int, "1230"), (TokenType::Eof, "")];
 
         let mut l = Lexer::new(input.to_string());
         for test in tests {
@@ -341,22 +326,22 @@ mod tests {
         ";
 
         let tests = vec![
-            (TokenType::Let, None),
-            (TokenType::Ident, Some("x".to_string())),
-            (TokenType::Assign, None),
-            (TokenType::Float, Some("3.14".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Let, None),
-            (TokenType::Ident, Some("y".to_string())),
-            (TokenType::Assign, None),
-            (TokenType::Float, Some("2".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Let, None),
-            (TokenType::Ident, Some("z".to_string())),
-            (TokenType::Assign, None),
-            (TokenType::Float, Some("0.5".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Eof, None),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "x"),
+            (TokenType::Assign, "="),
+            (TokenType::Float, "3.14"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "y"),
+            (TokenType::Assign, "="),
+            (TokenType::Float, "2"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "z"),
+            (TokenType::Assign, "="),
+            (TokenType::Float, "0.5"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Eof, ""),
         ];
 
         let mut l = Lexer::new(input.to_string());
@@ -381,10 +366,7 @@ mod tests {
     #[test]
     fn test_ignore_eof_as_number() {
         let input = "3210";
-        let tests = vec![
-            (TokenType::Int, Some("3210".to_string())),
-            (TokenType::Eof, None),
-        ];
+        let tests = vec![(TokenType::Int, "3210"), (TokenType::Eof, "")];
 
         let mut l = Lexer::new(input.to_string());
         for test in tests {
@@ -408,7 +390,7 @@ mod tests {
     #[test]
     fn test_empty() {
         let input = "";
-        let test = (TokenType::Eof, None);
+        let test = (TokenType::Eof, "");
 
         let mut l = Lexer::new(input.to_string());
         let token = l.next_token();
@@ -453,80 +435,80 @@ mod tests {
             ";
 
         let tests = vec![
-            (TokenType::Let, None),
-            (TokenType::Ident, Some("five".to_string())),
-            (TokenType::Assign, None),
-            (TokenType::Int, Some("5".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Let, None),
-            (TokenType::Ident, Some("ten".to_string())),
-            (TokenType::Assign, None),
-            (TokenType::Int, Some("10".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Let, None),
-            (TokenType::Ident, Some("add".to_string())),
-            (TokenType::Assign, None),
-            (TokenType::Function, None),
-            (TokenType::Lparen, None),
-            (TokenType::Ident, Some("x".to_string())),
-            (TokenType::Comma, None),
-            (TokenType::Ident, Some("y".to_string())),
-            (TokenType::Rparen, None),
-            (TokenType::Lbrace, None),
-            (TokenType::Ident, Some("x".to_string())),
-            (TokenType::Plus, None),
-            (TokenType::Ident, Some("y".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Rbrace, None),
-            (TokenType::Semicolon, None),
-            (TokenType::Let, None),
-            (TokenType::Ident, Some("result".to_string())),
-            (TokenType::Assign, None),
-            (TokenType::Ident, Some("add".to_string())),
-            (TokenType::Lparen, None),
-            (TokenType::Ident, Some("five".to_string())),
-            (TokenType::Comma, None),
-            (TokenType::Ident, Some("ten".to_string())),
-            (TokenType::Rparen, None),
-            (TokenType::Semicolon, None),
-            (TokenType::Bang, None),
-            (TokenType::Minus, None),
-            (TokenType::Slash, None),
-            (TokenType::Asterisk, None),
-            (TokenType::Int, Some("5".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Int, Some("5".to_string())),
-            (TokenType::Lt, None),
-            (TokenType::Int, Some("10".to_string())),
-            (TokenType::Gt, None),
-            (TokenType::Int, Some("5".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::If, None),
-            (TokenType::Lparen, None),
-            (TokenType::Int, Some("5".to_string())),
-            (TokenType::Lt, None),
-            (TokenType::Int, Some("10".to_string())),
-            (TokenType::Rparen, None),
-            (TokenType::Lbrace, None),
-            (TokenType::Return, None),
-            (TokenType::True, None),
-            (TokenType::Semicolon, None),
-            (TokenType::Rbrace, None),
-            (TokenType::Else, None),
-            (TokenType::Lbrace, None),
-            (TokenType::Return, None),
-            (TokenType::False, None),
-            (TokenType::Semicolon, None),
-            (TokenType::Rbrace, None),
-            (TokenType::Int, Some("5".to_string())),
-            (TokenType::Eq, None),
-            (TokenType::Int, Some("5".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Int, Some("5".to_string())),
-            (TokenType::NotEq, None),
-            (TokenType::Int, Some("10".to_string())),
-            (TokenType::Semicolon, None),
-            (TokenType::Eof, None),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "five"),
+            (TokenType::Assign, "="),
+            (TokenType::Int, "5"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "ten"),
+            (TokenType::Assign, "="),
+            (TokenType::Int, "10"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "add"),
+            (TokenType::Assign, "="),
+            (TokenType::Function, "fn"),
+            (TokenType::Lparen, "("),
+            (TokenType::Ident, "x"),
+            (TokenType::Comma, ","),
+            (TokenType::Ident, "y"),
+            (TokenType::Rparen, ")"),
+            (TokenType::Lbrace, "{"),
+            (TokenType::Ident, "x"),
+            (TokenType::Plus, "+"),
+            (TokenType::Ident, "y"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Rbrace, "}"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Let, "let"),
+            (TokenType::Ident, "result"),
+            (TokenType::Assign, "="),
+            (TokenType::Ident, "add"),
+            (TokenType::Lparen, "("),
+            (TokenType::Ident, "five"),
+            (TokenType::Comma, ","),
+            (TokenType::Ident, "ten"),
+            (TokenType::Rparen, ")"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Bang, "!"),
+            (TokenType::Minus, "-"),
+            (TokenType::Slash, "/"),
+            (TokenType::Asterisk, "*"),
+            (TokenType::Int, "5"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Int, "5"),
+            (TokenType::Lt, "<"),
+            (TokenType::Int, "10"),
+            (TokenType::Gt, ">"),
+            (TokenType::Int, "5"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::If, "if"),
+            (TokenType::Lparen, "("),
+            (TokenType::Int, "5"),
+            (TokenType::Lt, "<"),
+            (TokenType::Int, "10"),
+            (TokenType::Rparen, ")"),
+            (TokenType::Lbrace, "{"),
+            (TokenType::Return, "return"),
+            (TokenType::True, "true"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Rbrace, "}"),
+            (TokenType::Else, "else"),
+            (TokenType::Lbrace, "{"),
+            (TokenType::Return, "return"),
+            (TokenType::False, "false"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Rbrace, "}"),
+            (TokenType::Int, "5"),
+            (TokenType::Eq, "=="),
+            (TokenType::Int, "5"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Int, "5"),
+            (TokenType::NotEq, "!="),
+            (TokenType::Int, "10"),
+            (TokenType::Semicolon, ";"),
+            (TokenType::Eof, ""),
         ];
 
         let mut l = Lexer::new(input.to_string());
