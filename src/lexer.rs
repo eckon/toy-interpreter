@@ -47,7 +47,6 @@ impl Lexer {
 
         let token = match self.ch {
             None => Token::new(TokenType::Eof, self.position),
-            Some('=') => Token::new(TokenType::Assign, self.position),
             Some(';') => Token::new(TokenType::Semicolon, self.position),
             Some('(') => Token::new(TokenType::Lparen, self.position),
             Some(')') => Token::new(TokenType::Rparen, self.position),
@@ -56,11 +55,29 @@ impl Lexer {
             Some(',') => Token::new(TokenType::Comma, self.position),
             Some('+') => Token::new(TokenType::Plus, self.position),
             Some('-') => Token::new(TokenType::Minus, self.position),
-            Some('!') => Token::new(TokenType::Bang, self.position),
             Some('*') => Token::new(TokenType::Asterisk, self.position),
             Some('/') => Token::new(TokenType::Slash, self.position),
             Some('<') => Token::new(TokenType::Lt, self.position),
             Some('>') => Token::new(TokenType::Gt, self.position),
+            Some('=') => {
+                if let Some('=') = self.peak_char() {
+                    let token = Token::new(TokenType::Eq, self.position);
+                    self.read_char();
+                    token
+                } else {
+                    Token::new(TokenType::Assign, self.position)
+                }
+            }
+            Some('!') => {
+                if let Some('=') = self.peak_char() {
+                    let token = Token::new(TokenType::NotEq, self.position);
+                    self.read_char();
+                    token
+                } else {
+                    Token::new(TokenType::Bang, self.position)
+                }
+            }
+
             Some('0'..='9') => {
                 enum NumberType {
                     Int,
@@ -423,6 +440,9 @@ mod tests {
             } else {
                 return false;
             }
+
+            5 == 5;
+            5 != 10;
             ";
 
         let tests = vec![
@@ -491,6 +511,14 @@ mod tests {
             (TokenType::False, None),
             (TokenType::Semicolon, None),
             (TokenType::Rbrace, None),
+            (TokenType::Int, Some("5".to_string())),
+            (TokenType::Eq, None),
+            (TokenType::Int, Some("5".to_string())),
+            (TokenType::Semicolon, None),
+            (TokenType::Int, Some("5".to_string())),
+            (TokenType::NotEq, None),
+            (TokenType::Int, Some("10".to_string())),
+            (TokenType::Semicolon, None),
             (TokenType::Eof, None),
         ];
 

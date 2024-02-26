@@ -18,6 +18,8 @@ pub enum TokenType {
 
     Lt,
     Gt,
+    Eq,
+    NotEq,
 
     // Delimiters
     Comma,
@@ -43,12 +45,13 @@ pub struct Token {
     r#type: TokenType,
     literal: Option<String>,
     start_postion: usize,
-    length: usize,
+    length: Option<usize>,
 }
 
 impl Token {
     pub fn new(r#type: TokenType, start_postion: usize) -> Token {
         let length = match r#type {
+            TokenType::Illegal | TokenType::Eof => Some(0),
             TokenType::Assign
             | TokenType::Plus
             | TokenType::Minus
@@ -62,9 +65,9 @@ impl Token {
             | TokenType::Lparen
             | TokenType::Rparen
             | TokenType::Lbrace
-            | TokenType::Rbrace => 1,
-            TokenType::Illegal | TokenType::Eof => 0,
-            _ => 0,
+            | TokenType::Rbrace => Some(1),
+            TokenType::Eq | TokenType::NotEq => Some(2),
+            _ => None,
         };
 
         Token {
@@ -76,7 +79,12 @@ impl Token {
     }
 
     pub fn set_length(&mut self, length: usize) {
-        self.length = length;
+        match self.length {
+            Some(_) => {}
+            None => {
+                self.length = Some(length);
+            }
+        }
     }
 
     pub fn set_literal(&mut self, literal: String) {
@@ -92,6 +100,9 @@ impl Token {
     }
 
     pub fn get_position(&self) -> (usize, usize) {
-        (self.start_postion, self.start_postion + self.length)
+        (
+            self.start_postion,
+            self.start_postion + self.length.unwrap_or(0),
+        )
     }
 }
