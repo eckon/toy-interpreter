@@ -100,7 +100,7 @@ impl Lexer {
                 }
 
                 let literal = self.input[start_position..self.position].to_string();
-                let mut token = match number_type {
+                let token = match number_type {
                     NumberType::Int => {
                         let mut token = Token::new(TokenType::Int, start_position);
                         // remove leading 0s
@@ -120,8 +120,6 @@ impl Lexer {
                     }
                 };
 
-                token.set_length(self.position - start_position);
-
                 // need to return to not skip the next token
                 return token;
             }
@@ -136,7 +134,7 @@ impl Lexer {
                 }
 
                 let identifier = self.input[start_position..self.position].to_string();
-                let mut token = match identifier.as_str() {
+                let token = match identifier.as_str() {
                     "fn" => Token::new(TokenType::Function, start_position),
                     "let" => Token::new(TokenType::Let, start_position),
                     "true" => Token::new(TokenType::True, start_position),
@@ -150,8 +148,6 @@ impl Lexer {
                         token
                     }
                 };
-
-                token.set_length(self.position - start_position);
 
                 // need to return to not skip the next token
                 return token;
@@ -197,6 +193,8 @@ mod tests {
             let add2 = fn(x, y) {
                 x + y;
             };
+
+            if (true)
         ";
 
         let mut l = Lexer::new(input.to_string());
@@ -215,6 +213,15 @@ mod tests {
                         context_formatting(input.to_string(), &token)
                     )
                 }
+            }
+
+            if token.get_type() == TokenType::True {
+                assert_eq!(
+                    token.get_position(),
+                    (226, 230),
+                    "{}",
+                    context_formatting(input.to_string(), &token)
+                )
             }
         }
     }
@@ -422,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn test_complex() {
+    fn test_token_meaning_complex() {
         let input = "
             let five = 5;
             let ten = 10;
