@@ -10,13 +10,13 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(input: String) -> Lexer {
-        let mut l = Lexer {
+        let mut lexer = Lexer {
             input,
             ..Default::default()
         };
 
-        l.read_char();
-        l
+        lexer.read_char();
+        lexer
     }
 
     fn highlighted_input(input: String, token: &Token) -> String {
