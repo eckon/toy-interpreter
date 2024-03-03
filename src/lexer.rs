@@ -1,6 +1,6 @@
 use crate::token::{Token, TokenType};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Lexer {
     input: String,
     position: usize,
